@@ -16,17 +16,12 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Gegarandeerd stabiel en actief Groq-model
-GROQ_MODEL = "llama-3.1-8b-instant"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
     "Jay": os.getenv("TOKEN_JAY"),
     "Mia": os.getenv("TOKEN_MIA")
 }
-
-HUMAN_REPLY_CHANCE = 1.0
-BOT_REPLY_CHANCE = 1.0
 
 MAX_BOT_CHAIN = 6
 MAX_HISTORY = 20
@@ -57,7 +52,7 @@ SYSTEM_PROMPTS = {
 }
 
 # ==============================
-# GROQ
+# GROQ & AUTOMATISCHE MODEL DETECTIE
 # ==============================
 
 if not GROQ_API_KEY:
@@ -65,6 +60,23 @@ if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY is missing!")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+def get_active_groq_model():
+    """Haalt automatisch een geldig en werkend model op vanaf jouw Groq API-sleutel."""
+    try:
+        models_response = groq_client.models.list()
+        # Zoek naar een Llama-model in de lijst
+        for model in models_response.data:
+            if "llama" in model.id.lower():
+                print(f"[MODEL SUCCES] Automatisch geselecteerd Groq-model: {model.id}", flush=True)
+                return model.id
+    except Exception as e:
+        print(f"[MODEL WARNING] Kon models niet automatisch ophalen: {e}", flush=True)
+    
+    # Fallback als de list-api faalt
+    return "llama3-70b-8192"
+
+ACTIVE_MODEL = get_active_groq_model()
 
 # ==============================
 # SHARED DATA
@@ -98,7 +110,7 @@ async def generate_response(account_name):
     try:
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
-            model=GROQ_MODEL,
+            model=ACTIVE_MODEL,
             messages=messages,
             max_tokens=80,
             temperature=0.9
@@ -127,7 +139,7 @@ def get_available_bots(exclude=None):
     ]
 
 # ==============================
-# MESSAGE HANDLER
+# MESSAGE HANDLER & KICKSTART
 # ==============================
 
 async def handle_message(message):
@@ -182,7 +194,7 @@ async def handle_message(message):
             if len(history) > MAX_HISTORY:
                 del history[:-MAX_HISTORY]
 
-    available = get_available_bots(excluded)
+    available = get_available_bots(exclude=excluded)
     if not available:
         return
 
@@ -224,6 +236,37 @@ async def handle_message(message):
 
     except Exception as error:
         print(f"[ERROR] {account_name}: {error}", flush=True)
+
+async def trigger_first_message():
+    await asyncio.sleep(8)
+    available = [b for b in clients.values() if b.user is not None]
+    if not available:
+        return
+    
+    starter = random.choice(available)
+    print(f"[KICKSTART] {starter.account_name} trapt het gesprek af!", flush=True)
+    
+    response = await generate_response(starter.account_name)
+    if response:
+        try:
+            channel = starter.get_channel(CHANNEL_ID)
+            if channel is None:
+                channel = await starter.fetch_channel(CHANNEL_ID)
+            
+            sent_message = await channel.send(response)
+            
+            async with event_lock:
+                processed_messages.add(sent_message.id)
+                processed_order.append(sent_message.id)
+                async with history_lock:
+                    history.append({
+                        "role": "user",
+                        "content": f"{starter.account_name}: {response}"
+                    })
+                bot_chain[CHANNEL_ID] = 1
+            print(f"[{starter.account_name}] Startbericht gestuurd: {response}", flush=True)
+        except Exception as e:
+            print(f"[KICKSTART ERROR] {e}", flush=True)
 
 # ==============================
 # DISCORD CLIENT
@@ -268,6 +311,8 @@ async def main():
         asyncio.create_task(bot.start(bot.token_str))
         print(f"[INIT] Startsignaal gegeven voor {name}", flush=True)
         await asyncio.sleep(4)
+
+    asyncio.create_task(trigger_first_message())
 
     while True:
         await asyncio.sleep(3600)
