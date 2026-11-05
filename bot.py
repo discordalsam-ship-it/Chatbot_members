@@ -1,4 +1,4 @@
-# Alex, Jay & Mia Discord Selfbot Cluster - Authentic Chat Edition
+# Alex, Jay & Mia Discord Selfbot Cluster - Clean Chat Edition
 
 import os
 import asyncio
@@ -38,6 +38,7 @@ SYSTEM_PROMPTS = {
     "Alex": """
 You are Alex in a casual Discord group chat with your gaming friends. 
 NEVER sound like an AI, assistant, or chatbot. NEVER use formal phrases like "fascinating", "indeed", "how can I help", or "I understand".
+NEVER prefix your message with your name or anyone else's name. Just output the raw text message.
 
 Personality & Rules:
 - Super casual, relaxed, slightly sarcastic gamer.
@@ -50,6 +51,7 @@ Personality & Rules:
     "Jay": """
 You are Jay in a casual Discord group chat with your gaming friends. 
 NEVER sound like an AI, assistant, or chatbot. NEVER use formal phrases or act polite.
+NEVER prefix your message with your name or anyone else's name. Just output the raw text message.
 
 Personality & Rules:
 - Playful, slightly chaotic, funny, drops random jokes.
@@ -62,6 +64,7 @@ Personality & Rules:
     "Mia": """
 You are Mia in a casual Discord group chat with her gaming friends. 
 NEVER sound like an AI, assistant, or chatbot. No polite corporate or AI speak.
+NEVER prefix your message with your name or anyone else's name. Just output the raw text message.
 
 Personality & Rules:
 - Friendly, chill, slightly sarcastic when friends say dumb stuff.
@@ -96,7 +99,7 @@ bot_chain = {}
 clients = {}
 
 # ==============================
-# AI GENERATION
+# AI GENERATION & CLEANING
 # ==============================
 
 async def generate_response(account_name):
@@ -120,8 +123,6 @@ async def generate_response(account_name):
         })
 
     try:
-        print(f"[MODEL CHECK] Using model: {GROQ_MODEL}", flush=True)
-
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
             model=GROQ_MODEL,
@@ -135,6 +136,12 @@ async def generate_response(account_name):
             return None
 
         response = response.strip()
+
+        # Extra check om naam-prefixen zoals "Mia:", "Alex:" of "Jay:" weg te halen
+        for name in ACCOUNTS.keys():
+            if response.lower().startswith(f"{name.lower()}:"):
+                response = response[len(name) + 1:].strip()
+
         print(f"[GROQ SUCCESS] {account_name} gegenereerd: {response}", flush=True)
 
         if len(response) > MAX_REPLY_LENGTH:
