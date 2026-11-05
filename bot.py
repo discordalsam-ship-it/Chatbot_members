@@ -1,4 +1,4 @@
-# Alex, Jay & Mia Discord Selfbot Cluster - Final Fix Edition
+# Alex, Jay & Mia Discord Selfbot Cluster - Updated Model Edition
 
 import os
 import asyncio
@@ -18,8 +18,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Gegarandeerd werkend en universeel model op Groq
-GROQ_MODEL = "llama3-70b-8192"
+# Actief en ondersteund Groq model
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -140,7 +140,6 @@ async def generate_response(account_name):
 
         response = response.strip()
 
-        # Verwijder eventuele naam-prefixen voor de zekerheid
         for name in ACCOUNTS.keys():
             if response.lower().startswith(f"{name.lower()}:"):
                 response = response[len(name) + 1:].strip()
