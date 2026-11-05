@@ -22,10 +22,12 @@ ACCOUNTS = {
     "Mia": os.getenv("TOKEN_MIA")
 }
 
-HUMAN_REPLY_CHANCE = 0.45
-BOT_REPLY_CHANCE = 0.30
+# 100% kans om te reageren op alles
+HUMAN_REPLY_CHANCE = 1.0
+BOT_REPLY_CHANCE = 1.0
 
-MAX_BOT_CHAIN = 2
+# Hoe vaak ze op elkaar mogen reageren achter elkaar (zodat ze lekker doorchatten)
+MAX_BOT_CHAIN = 6
 MAX_HISTORY = 20
 MAX_REPLY_LENGTH = 400
 
@@ -37,18 +39,19 @@ SYSTEM_PROMPTS = {
     "Alex": (
         "You are Alex, a casual Discord user and gamer. "
         "Use natural lowercase English, occasional slang like fr, ngl and bro. "
-        "Keep messages short and varied. Never pretend to be an AI."
+        "Keep messages short, conversational and varied. Never pretend to be an AI."
     ),
     "Jay": (
         "You are Jay, a chill Discord user and gamer. "
         "Use casual English, natural reactions and occasional slang. "
-        "Sometimes joke around. Avoid repetitive replies. "
+        "Sometimes joke around or react to what others just said. "
         "Never pretend to be an AI."
     ),
     "Mia": (
         "You are Mia, a friendly Discord user. "
         "Use natural casual English, varied sentence structures and "
-        "realistic conversational reactions. Never pretend to be an AI."
+        "realistic conversational reactions. Keep the chat flowing. "
+        "Never pretend to be an AI."
     )
 }
 
@@ -157,8 +160,16 @@ async def handle_message(message):
             processed_messages.clear()
             processed_messages.update(processed_order)
 
-        if not is_our_bot:
+        current_chain = bot_chain.get(CHANNEL_ID, 0)
+
+        if is_our_bot:
+            if current_chain >= MAX_BOT_CHAIN:
+                return
+            # Sluit de afzender uit zodat een andere bot reageert
+            excluded = {message.author.id}
+        else:
             bot_chain[CHANNEL_ID] = 0
+            excluded = set()
 
         async with history_lock:
             history.append({
@@ -168,17 +179,6 @@ async def handle_message(message):
             if len(history) > MAX_HISTORY:
                 del history[:-MAX_HISTORY]
 
-        if is_our_bot:
-            if bot_chain.get(CHANNEL_ID, 0) >= MAX_BOT_CHAIN:
-                return
-            if random.random() > BOT_REPLY_CHANCE:
-                return
-            excluded = {message.author.id}
-        else:
-            if random.random() > HUMAN_REPLY_CHANCE:
-                return
-            excluded = set()
-
     available = get_available_bots(excluded)
     if not available:
         return
@@ -186,7 +186,9 @@ async def handle_message(message):
     selected = random.choice(available)
     account_name = selected.account_name
 
-    await asyncio.sleep(random.uniform(2.0, 5.0))
+    # Natuurlijke pauze voordat ze reageren
+    await asyncio.sleep(random.uniform(2.0, 4.0))
+
     response = await generate_response(account_name)
     if not response:
         return
@@ -199,12 +201,23 @@ async def handle_message(message):
         async with channel.typing():
             await asyncio.sleep(random.uniform(1.0, 2.0))
 
-        await channel.send(response)
+        sent_message = await channel.send(response)
 
-        if is_our_bot:
-            bot_chain[CHANNEL_ID] = bot_chain.get(CHANNEL_ID, 0) + 1
-        else:
-            bot_chain[CHANNEL_ID] = 1
+        # Voeg de bot-reactie direct toe aan processed_messages zodat ze elkaars bericht oppikken
+        async with event_lock:
+            processed_messages.add(sent_message.id)
+            processed_order.append(sent_message.id)
+            
+            async with history_lock:
+                history.append({
+                    "role": "user",
+                    "content": f"{account_name}: {response}"
+                })
+
+            if is_our_bot:
+                bot_chain[CHANNEL_ID] = current_chain + 1
+            else:
+                bot_chain[CHANNEL_ID] = 1
 
         print(f"[{account_name}] {response}")
 
