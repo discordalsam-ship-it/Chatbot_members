@@ -6,6 +6,8 @@ from collections import deque
 import discord
 from groq import Groq
 
+print("[START] Python script wordt geladen...", flush=True)
+
 # ==============================
 # CONFIG
 # ==============================
@@ -22,11 +24,9 @@ ACCOUNTS = {
     "Mia": os.getenv("TOKEN_MIA")
 }
 
-# 100% kans om te reageren op alles
 HUMAN_REPLY_CHANCE = 1.0
 BOT_REPLY_CHANCE = 1.0
 
-# Hoe vaak ze op elkaar mogen reageren achter elkaar (zodat ze lekker doorchatten)
 MAX_BOT_CHAIN = 6
 MAX_HISTORY = 20
 MAX_REPLY_LENGTH = 400
@@ -60,6 +60,7 @@ SYSTEM_PROMPTS = {
 # ==============================
 
 if not GROQ_API_KEY:
+    print("[ERROR] GROQ_API_KEY ontbreekt in Render Environment Variables!", flush=True)
     raise RuntimeError("GROQ_API_KEY is missing!")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -113,7 +114,7 @@ async def generate_response(account_name):
         return response or None
 
     except Exception as error:
-        print(f"[GROQ ERROR] {account_name}: {error}")
+        print(f"[GROQ ERROR] {account_name}: {error}", flush=True)
         return None
 
 def get_available_bots(exclude=None):
@@ -149,6 +150,8 @@ async def handle_message(message):
     if message.author.bot and not is_our_bot:
         return
 
+    print(f"[BERICHT ONTVANGEN] Van {message.author.name}: {message.content}", flush=True)
+
     async with event_lock:
         if message.id in processed_messages:
             return
@@ -165,7 +168,6 @@ async def handle_message(message):
         if is_our_bot:
             if current_chain >= MAX_BOT_CHAIN:
                 return
-            # Sluit de afzender uit zodat een andere bot reageert
             excluded = {message.author.id}
         else:
             bot_chain[CHANNEL_ID] = 0
@@ -186,7 +188,6 @@ async def handle_message(message):
     selected = random.choice(available)
     account_name = selected.account_name
 
-    # Natuurlijke pauze voordat ze reageren
     await asyncio.sleep(random.uniform(2.0, 4.0))
 
     response = await generate_response(account_name)
@@ -203,7 +204,6 @@ async def handle_message(message):
 
         sent_message = await channel.send(response)
 
-        # Voeg de bot-reactie direct toe aan processed_messages zodat ze elkaars bericht oppikken
         async with event_lock:
             processed_messages.add(sent_message.id)
             processed_order.append(sent_message.id)
@@ -219,10 +219,10 @@ async def handle_message(message):
             else:
                 bot_chain[CHANNEL_ID] = 1
 
-        print(f"[{account_name}] {response}")
+        print(f"[{account_name}] Reactie gestuurd: {response}", flush=True)
 
     except Exception as error:
-        print(f"[ERROR] {account_name}: {error}")
+        print(f"[ERROR] {account_name}: {error}", flush=True)
 
 # ==============================
 # DISCORD CLIENT
@@ -235,7 +235,7 @@ class MultiAccountBot(discord.Client):
         self.token_str = token
 
     async def on_ready(self):
-        print(f"[ONLINE] {self.account_name} ingelogd als gebruiker {self.user}")
+        print(f"[ONLINE] {self.account_name} ingelogd als gebruiker {self.user}", flush=True)
 
     async def on_message(self, message):
         await handle_message(message)
@@ -246,33 +246,38 @@ class MultiAccountBot(discord.Client):
 
 async def main():
     if not GUILD_ID or not CHANNEL_ID:
+        print("[ERROR] GUILD_ID of CHANNEL_ID ontbreekt in Render Environment Variables!", flush=True)
         raise RuntimeError("GUILD_ID or CHANNEL_ID is missing!")
 
     for name, token in ACCOUNTS.items():
         if not token:
-            print(f"[WARNING] Geen token gevonden voor {name}")
+            print(f"[WARNING] Geen token gevonden voor {name}", flush=True)
             continue
 
         bot = MultiAccountBot(name, token)
         clients[name] = bot
 
     if not clients:
+        print("[ERROR] Geen enkele bot token is geconfigureerd!", flush=True)
         raise RuntimeError("Geen tokens geconfigureerd!")
 
-    print("[STARTING] Starten van Discord selfbots...")
+    print("[STARTING] Starten van de selfbots met vertraging...", flush=True)
 
-    await asyncio.gather(
-        *[
-            bot.start(bot.token_str)
-            for bot in clients.values()
-        ]
-    )
+    # Start de bots één voor één met een kleine pauze ertussen om rate-limits te voorkomen
+    for name, bot in clients.items():
+        asyncio.create_task(bot.start(bot.token_str))
+        print(f"[INIT] Startsignaal gegeven voor {name}", flush=True)
+        await asyncio.sleep(4)
+
+    # Houd de loop draaiende
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("[STOP] Bots gestopt.")
+        print("[STOP] Bots gestopt.", flush=True)
     except Exception as error:
-        print(f"[FATAL ERROR] {error}")
+        print(f"[FATAL ERROR] {error}", flush=True)
         raise
