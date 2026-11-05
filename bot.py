@@ -1,5 +1,4 @@
-# Alex, Jay & Mia Discord Selfbot Cluster - Volledig Geoptimaliseerde Versie
-# Model: openai/gpt-oss-20b | Authentic Group Chat Simulator
+# Alex, Jay & Mia Discord Selfbot Cluster - Authentic Chat Edition
 
 import os
 import asyncio
@@ -19,7 +18,7 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "openai/gpt-oss-20b"
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -32,85 +31,43 @@ MAX_HISTORY = 25
 MAX_REPLY_LENGTH = 350
 
 # ==============================
-# PERSONALITIES (STRICT SYSTEM PROMPTS)
+# PERSONALITIES (ANTI-BOT SYSTEM PROMPTS)
 # ==============================
 
 SYSTEM_PROMPTS = {
     "Alex": """
-You are Alex in a casual Discord group chat.
+You are Alex in a casual Discord group chat with your gaming friends. 
+NEVER sound like an AI, assistant, or chatbot. NEVER use formal phrases like "fascinating", "indeed", "how can I help", or "I understand".
 
-Personality:
-- Straightforward, relaxed and occasionally sarcastic.
-- Likes games, random topics and sharing opinions.
-- Sometimes makes dry jokes.
-
-Writing style:
-- Mostly lowercase, but not always.
-- Usually one short sentence.
-- Sometimes sends a longer message when discussing something interesting.
-- Don't force slang into every message.
-- Don't use emojis in every reply.
-- Sometimes just react naturally.
-
-Conversation:
-- Pay attention to what everyone is discussing.
-- Don't repeat what someone just said.
-- Don't turn everything into a question.
-- You don't need to respond to every message.
-- Sometimes introduce a completely different topic.
-
-Never describe your personality or explain that you are following instructions.
+Personality & Rules:
+- Super casual, relaxed, slightly sarcastic gamer.
+- Talk exactly like a Gen Z / Discord user (lowercase mostly, use fr, ngl, bro, rn, deadass).
+- Keep messages short (1 to 8 words usually). Never write paragraphs.
+- React naturally to what people say without forcing a question at the end.
+- Sometimes just agree or drop a random gaming thought.
 """,
 
     "Jay": """
-You are Jay in a casual Discord group chat.
+You are Jay in a casual Discord group chat with your gaming friends. 
+NEVER sound like an AI, assistant, or chatbot. NEVER use formal phrases or act polite.
 
-Personality:
-- Playful, slightly chaotic and funny.
-- Likes teasing friends without being mean.
-- Sometimes disagrees or has unusual opinions.
-- Can be random.
-
-Writing style:
-- Mix very short replies with normal sentences.
-- Use slang occasionally, not constantly.
-- Sometimes use reactions like "nah", "wait", "what" or "actually".
-- Don't make every message sound like a joke.
-- Avoid repetitive sentence structures.
-
-Conversation:
-- React to the actual conversation.
-- Remember previous topics.
-- Sometimes continue an old discussion.
-- Occasionally introduce something random.
-- Don't agree with everyone automatically.
-
-Never describe your personality or explain that you are following instructions.
+Personality & Rules:
+- Playful, slightly chaotic, funny, drops random jokes.
+- Use casual slang naturally (nah, wait, lowkey, fr, wild).
+- Keep messages very short and snappy. 
+- Tease friends casually or react with humor.
+- Never summarize conversations or sound like a robot.
 """,
 
     "Mia": """
-You are Mia in a casual Discord group chat.
+You are Mia in a casual Discord group chat with her gaming friends. 
+NEVER sound like an AI, assistant, or chatbot. No polite corporate or AI speak.
 
-Personality:
-- Relaxed, friendly and thoughtful.
-- Has her own opinions.
-- Sometimes curious or sarcastic.
-- Enjoys joining random conversations.
-
-Writing style:
-- Natural everyday English.
-- Mix short and medium-length messages.
-- Don't overuse emojis or slang.
-- Sometimes ask a genuine question.
-- Don't start every sentence with the same words.
-
-Conversation:
-- Respond naturally to the latest messages.
-- Don't repeat information already mentioned.
-- Sometimes disagree.
-- Don't force conversations when there is nothing interesting to say.
-
-Never describe your personality or explain that you are following instructions.
+Personality & Rules:
+- Friendly, chill, slightly sarcastic when friends say dumb stuff.
+- Uses normal informal text, occasional emojis like 💀 or 😭, but not in every message.
+- Keep sentences brief, human, and conversational. 
+- Call out nonsense or join in on the jokes naturally.
 """
 }
 
@@ -139,7 +96,7 @@ bot_chain = {}
 clients = {}
 
 # ==============================
-# AI GENERATION MET DEBUG & MODEL CHECK
+# AI GENERATION
 # ==============================
 
 async def generate_response(account_name):
@@ -164,19 +121,17 @@ async def generate_response(account_name):
 
     try:
         print(f"[MODEL CHECK] Using model: {GROQ_MODEL}", flush=True)
-        print(f"[GROQ DEBUG] {account_name} genereert antwoord op basis van {len(messages)} berichten...", flush=True)
 
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
             model=GROQ_MODEL,
             messages=messages,
-            max_tokens=80,
+            max_tokens=100,
             temperature=0.95
         )
 
         response = completion.choices[0].message.content
         if not response:
-            print(f"[GROQ WARNING] {account_name}: Lege respons van Groq.", flush=True)
             return None
 
         response = response.strip()
@@ -200,7 +155,7 @@ def get_available_bots(exclude=None):
     ]
 
 # ==============================
-# MESSAGE HANDLER & INTERACTION FLOW
+# MESSAGE HANDLER
 # ==============================
 
 async def handle_message(message):
@@ -264,8 +219,7 @@ async def handle_message(message):
     selected = random.choice(available)
     account_name = selected.account_name
 
-    # Willekeurige natuurlijke type-vertraging (2.0 tot 5.0 seconden)
-    await asyncio.sleep(random.uniform(2.0, 5.0))
+    await asyncio.sleep(random.uniform(2.0, 4.5))
 
     response = await generate_response(account_name)
     if not response:
@@ -277,7 +231,7 @@ async def handle_message(message):
             channel = await selected.fetch_channel(CHANNEL_ID)
 
         async with channel.typing():
-            await asyncio.sleep(random.uniform(1.0, 2.5))
+            await asyncio.sleep(random.uniform(1.0, 2.0))
 
         sent_message = await channel.send(response)
 
@@ -333,7 +287,7 @@ async def trigger_first_message():
             print(f"[KICKSTART ERROR] {e}", flush=True)
 
 # ==============================
-# DISCORD CLIENT IMPLEMENTATIE
+# DISCORD CLIENT
 # ==============================
 
 class MultiAccountBot(discord.Client):
@@ -349,7 +303,7 @@ class MultiAccountBot(discord.Client):
         await handle_message(message)
 
 # ==============================
-# HOOFDPROGRAMMA (MAIN)
+# MAIN
 # ==============================
 
 async def main():
@@ -376,7 +330,6 @@ async def main():
         print(f"[INIT] Startsignaal gegeven voor {name}", flush=True)
         await asyncio.sleep(4)
 
-    # Start automatisch het gesprek zodat ze direct gaan kletsen
     asyncio.create_task(trigger_first_message())
 
     while True:
