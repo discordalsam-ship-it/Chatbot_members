@@ -16,8 +16,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Aangepast naar het gevraagde model
-GROQ_MODEL = "openai/gpt-oss-20b"
+# Gegarandeerd stabiel chat-model op Groq
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -101,6 +101,8 @@ async def generate_response(account_name):
             "content": msg["content"]
         })
 
+    print(f"[GROQ DEBUG] {account_name} stuurt {len(messages)} berichten naar Groq...", flush=True)
+
     try:
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
@@ -112,9 +114,12 @@ async def generate_response(account_name):
 
         response = completion.choices[0].message.content
         if not response:
+            print(f"[GROQ WARNING] {account_name}: Groq gaf een lege response terug!", flush=True)
             return None
 
         response = response.strip()
+        print(f"[GROQ SUCCESS] {account_name} gegenereerd: {response}", flush=True)
+
         if len(response) > MAX_REPLY_LENGTH:
             response = response[:MAX_REPLY_LENGTH].rsplit(" ", 1)[0]
 
@@ -192,11 +197,13 @@ async def handle_message(message):
 
     available = get_available_bots(exclude=excluded)
     if not available:
+        print("[DEBUG] Geen beschikbare bots om op te reageren.", flush=True)
         return
 
     selected = random.choice(available)
     account_name = selected.account_name
 
+    print(f"[DEBUG] {account_name} is gekozen om te reageren. Wachten...", flush=True)
     await asyncio.sleep(random.uniform(2.0, 4.0))
 
     response = await generate_response(account_name)
@@ -228,10 +235,10 @@ async def handle_message(message):
             else:
                 bot_chain[CHANNEL_ID] = 1
 
-        print(f"[{account_name}] Reactie gestuurd: {response}", flush=True)
+        print(f"[{account_name}] Reactie gestuurd in Discord: {response}", flush=True)
 
     except Exception as error:
-        print(f"[ERROR] {account_name}: {error}", flush=True)
+        print(f"[DISCORD SEND ERROR] {account_name}: {error}", flush=True)
 
 async def trigger_first_message():
     await asyncio.sleep(8)
@@ -260,7 +267,7 @@ async def trigger_first_message():
                         "content": f"{starter.account_name}: {response}"
                     })
                 bot_chain[CHANNEL_ID] = 1
-            print(f"[{starter.account_name}] Startbericht gestuurd: {response}", flush=True)
+            print(f"[{starter.account_name}] Startbericht succesvol gestuurd!", flush=True)
         except Exception as e:
             print(f"[KICKSTART ERROR] {e}", flush=True)
 
@@ -301,7 +308,7 @@ async def main():
         print("[ERROR] Geen enkele bot token is geconfigureerd!", flush=True)
         raise RuntimeError("Geen tokens geconfigureerd!")
 
-    print("[STARTING] Starten van de selfbots met vertraging...", flush=True)
+    print("[STARTING] Starten van de selfbots...", flush=True)
 
     for name, bot in clients.items():
         asyncio.create_task(bot.start(bot.token_str))
