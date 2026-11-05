@@ -16,7 +16,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Aangepast naar een werkend en stabiel Groq-model
+GROQ_MODEL = "llama-3.1-70b-versatile"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -263,13 +264,11 @@ async def main():
 
     print("[STARTING] Starten van de selfbots met vertraging...", flush=True)
 
-    # Start de bots één voor één met een kleine pauze ertussen om rate-limits te voorkomen
     for name, bot in clients.items():
         asyncio.create_task(bot.start(bot.token_str))
         print(f"[INIT] Startsignaal gegeven voor {name}", flush=True)
         await asyncio.sleep(4)
 
-    # Houd de loop draaiende
     while True:
         await asyncio.sleep(3600)
 
