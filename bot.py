@@ -16,8 +16,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Aangepast naar een werkend en stabiel Groq-model
-GROQ_MODEL = "llama-3.1-70b-versatile"
+# Gegarandeerd stabiel en actief Groq-model
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
