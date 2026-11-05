@@ -1,4 +1,4 @@
-# Alex, Jay & Mia Discord Selfbot Cluster - Clean Chat Edition
+# Alex, Jay & Mia Discord Selfbot Cluster - Final Fix Edition
 
 import os
 import asyncio
@@ -18,7 +18,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.1-8b-instant"
+# Gegarandeerd werkend en universeel model op Groq
+GROQ_MODEL = "llama3-70b-8192"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -123,6 +124,8 @@ async def generate_response(account_name):
         })
 
     try:
+        print(f"[MODEL CHECK] Using model: {GROQ_MODEL}", flush=True)
+
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
             model=GROQ_MODEL,
@@ -137,7 +140,7 @@ async def generate_response(account_name):
 
         response = response.strip()
 
-        # Extra check om naam-prefixen zoals "Mia:", "Alex:" of "Jay:" weg te halen
+        # Verwijder eventuele naam-prefixen voor de zekerheid
         for name in ACCOUNTS.keys():
             if response.lower().startswith(f"{name.lower()}:"):
                 response = response[len(name) + 1:].strip()
