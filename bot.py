@@ -16,6 +16,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Vastgesteld stabiel chat-model
+ACTIVE_MODEL = "llama-3.3-70b-versatile"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -52,7 +54,7 @@ SYSTEM_PROMPTS = {
 }
 
 # ==============================
-# GROQ & AUTOMATISCHE MODEL DETECTIE
+# GROQ
 # ==============================
 
 if not GROQ_API_KEY:
@@ -60,23 +62,6 @@ if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY is missing!")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-
-def get_active_groq_model():
-    """Haalt automatisch een geldig en werkend model op vanaf jouw Groq API-sleutel."""
-    try:
-        models_response = groq_client.models.list()
-        # Zoek naar een Llama-model in de lijst
-        for model in models_response.data:
-            if "llama" in model.id.lower():
-                print(f"[MODEL SUCCES] Automatisch geselecteerd Groq-model: {model.id}", flush=True)
-                return model.id
-    except Exception as e:
-        print(f"[MODEL WARNING] Kon models niet automatisch ophalen: {e}", flush=True)
-    
-    # Fallback als de list-api faalt
-    return "llama3-70b-8192"
-
-ACTIVE_MODEL = get_active_groq_model()
 
 # ==============================
 # SHARED DATA
@@ -98,14 +83,26 @@ clients = {}
 
 async def generate_response(account_name):
     async with history_lock:
-        conversation = list(history[-MAX_HISTORY:])
+        # Zorg ervoor dat de rollen netjes om en om of geldig zijn voor Groq
+        raw_conversation = list(history[-MAX_HISTORY:])
 
+    # Bouw een schone lijst op voor de chat API
     messages = [
         {
             "role": "system",
             "content": SYSTEM_PROMPTS[account_name]
         }
-    ] + conversation
+    ]
+
+    # Voeg alleen geldige user/assistant berichten toe
+    for msg in raw_conversation:
+        role = msg.get("role", "user")
+        if role not in ["user", "assistant"]:
+            role = "user"
+        messages.append({
+            "role": role,
+            "content": msg["content"]
+        })
 
     try:
         completion = await asyncio.to_thread(
@@ -182,13 +179,15 @@ async def handle_message(message):
             if current_chain >= MAX_BOT_CHAIN:
                 return
             excluded = {message.author.id}
+            sender_role = "assistant"
         else:
             bot_chain[CHANNEL_ID] = 0
             excluded = set()
+            sender_role = "user"
 
         async with history_lock:
             history.append({
-                "role": "user",
+                "role": sender_role,
                 "content": f"{message.author.display_name}: {message.content}"
             })
             if len(history) > MAX_HISTORY:
@@ -223,7 +222,7 @@ async def handle_message(message):
             
             async with history_lock:
                 history.append({
-                    "role": "user",
+                    "role": "assistant",
                     "content": f"{account_name}: {response}"
                 })
 
@@ -260,7 +259,7 @@ async def trigger_first_message():
                 processed_order.append(sent_message.id)
                 async with history_lock:
                     history.append({
-                        "role": "user",
+                        "role": "assistant",
                         "content": f"{starter.account_name}: {response}"
                     })
                 bot_chain[CHANNEL_ID] = 1
