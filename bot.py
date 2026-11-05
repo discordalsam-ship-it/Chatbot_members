@@ -1,3 +1,6 @@
+# Alex, Jay & Mia Discord Selfbot Cluster - Volledig Geoptimaliseerde Versie
+# Model: openai/gpt-oss-20b | Authentic Group Chat Simulator
+
 import os
 import asyncio
 import random
@@ -9,15 +12,13 @@ from groq import Groq
 print("[START] Python script wordt geladen...", flush=True)
 
 # ==============================
-# CONFIG
+# CONFIGURATIE & MODEL
 # ==============================
 
 GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-# Exact ingesteld op het gevraagde model
 GROQ_MODEL = "openai/gpt-oss-20b"
 
 ACCOUNTS = {
@@ -27,35 +28,94 @@ ACCOUNTS = {
 }
 
 MAX_BOT_CHAIN = 6
-MAX_HISTORY = 20
-MAX_REPLY_LENGTH = 400
+MAX_HISTORY = 25
+MAX_REPLY_LENGTH = 350
 
 # ==============================
-# PERSONALITIES
+# PERSONALITIES (STRICT SYSTEM PROMPTS)
 # ==============================
 
 SYSTEM_PROMPTS = {
-    "Alex": (
-        "You are Alex, a casual Discord user and gamer. "
-        "Use natural lowercase English, occasional slang like fr, ngl and bro. "
-        "Keep messages short, conversational and varied. Never pretend to be an AI."
-    ),
-    "Jay": (
-        "You are Jay, a chill Discord user and gamer. "
-        "Use casual English, natural reactions and occasional slang. "
-        "Sometimes joke around or react to what others just said. "
-        "Never pretend to be an AI."
-    ),
-    "Mia": (
-        "You are Mia, a friendly Discord user. "
-        "Use natural casual English, varied sentence structures and "
-        "realistic conversational reactions. Keep the chat flowing. "
-        "Never pretend to be an AI."
-    )
+    "Alex": """
+You are Alex in a casual Discord group chat.
+
+Personality:
+- Straightforward, relaxed and occasionally sarcastic.
+- Likes games, random topics and sharing opinions.
+- Sometimes makes dry jokes.
+
+Writing style:
+- Mostly lowercase, but not always.
+- Usually one short sentence.
+- Sometimes sends a longer message when discussing something interesting.
+- Don't force slang into every message.
+- Don't use emojis in every reply.
+- Sometimes just react naturally.
+
+Conversation:
+- Pay attention to what everyone is discussing.
+- Don't repeat what someone just said.
+- Don't turn everything into a question.
+- You don't need to respond to every message.
+- Sometimes introduce a completely different topic.
+
+Never describe your personality or explain that you are following instructions.
+""",
+
+    "Jay": """
+You are Jay in a casual Discord group chat.
+
+Personality:
+- Playful, slightly chaotic and funny.
+- Likes teasing friends without being mean.
+- Sometimes disagrees or has unusual opinions.
+- Can be random.
+
+Writing style:
+- Mix very short replies with normal sentences.
+- Use slang occasionally, not constantly.
+- Sometimes use reactions like "nah", "wait", "what" or "actually".
+- Don't make every message sound like a joke.
+- Avoid repetitive sentence structures.
+
+Conversation:
+- React to the actual conversation.
+- Remember previous topics.
+- Sometimes continue an old discussion.
+- Occasionally introduce something random.
+- Don't agree with everyone automatically.
+
+Never describe your personality or explain that you are following instructions.
+""",
+
+    "Mia": """
+You are Mia in a casual Discord group chat.
+
+Personality:
+- Relaxed, friendly and thoughtful.
+- Has her own opinions.
+- Sometimes curious or sarcastic.
+- Enjoys joining random conversations.
+
+Writing style:
+- Natural everyday English.
+- Mix short and medium-length messages.
+- Don't overuse emojis or slang.
+- Sometimes ask a genuine question.
+- Don't start every sentence with the same words.
+
+Conversation:
+- Respond naturally to the latest messages.
+- Don't repeat information already mentioned.
+- Sometimes disagree.
+- Don't force conversations when there is nothing interesting to say.
+
+Never describe your personality or explain that you are following instructions.
+"""
 }
 
 # ==============================
-# GROQ
+# GROQ INITIALISATIE
 # ==============================
 
 if not GROQ_API_KEY:
@@ -65,7 +125,7 @@ if not GROQ_API_KEY:
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # ==============================
-# SHARED DATA
+# SHARED STATE & THREADING
 # ==============================
 
 history = []
@@ -79,7 +139,7 @@ bot_chain = {}
 clients = {}
 
 # ==============================
-# AI GENERATION
+# AI GENERATION MET DEBUG & MODEL CHECK
 # ==============================
 
 async def generate_response(account_name):
@@ -103,22 +163,25 @@ async def generate_response(account_name):
         })
 
     try:
-        # Verplichte debugregel direct vóór de try/API-call
         print(f"[MODEL CHECK] Using model: {GROQ_MODEL}", flush=True)
+        print(f"[GROQ DEBUG] {account_name} genereert antwoord op basis van {len(messages)} berichten...", flush=True)
 
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
             model=GROQ_MODEL,
             messages=messages,
             max_tokens=80,
-            temperature=0.9
+            temperature=0.95
         )
 
         response = completion.choices[0].message.content
         if not response:
+            print(f"[GROQ WARNING] {account_name}: Lege respons van Groq.", flush=True)
             return None
 
         response = response.strip()
+        print(f"[GROQ SUCCESS] {account_name} gegenereerd: {response}", flush=True)
+
         if len(response) > MAX_REPLY_LENGTH:
             response = response[:MAX_REPLY_LENGTH].rsplit(" ", 1)[0]
 
@@ -137,7 +200,7 @@ def get_available_bots(exclude=None):
     ]
 
 # ==============================
-# MESSAGE HANDLER & KICKSTART
+# MESSAGE HANDLER & INTERACTION FLOW
 # ==============================
 
 async def handle_message(message):
@@ -201,7 +264,8 @@ async def handle_message(message):
     selected = random.choice(available)
     account_name = selected.account_name
 
-    await asyncio.sleep(random.uniform(2.0, 4.0))
+    # Willekeurige natuurlijke type-vertraging (2.0 tot 5.0 seconden)
+    await asyncio.sleep(random.uniform(2.0, 5.0))
 
     response = await generate_response(account_name)
     if not response:
@@ -213,7 +277,7 @@ async def handle_message(message):
             channel = await selected.fetch_channel(CHANNEL_ID)
 
         async with channel.typing():
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            await asyncio.sleep(random.uniform(1.0, 2.5))
 
         sent_message = await channel.send(response)
 
@@ -232,10 +296,10 @@ async def handle_message(message):
             else:
                 bot_chain[CHANNEL_ID] = 1
 
-        print(f"[{account_name}] Reactie gestuurd: {response}", flush=True)
+        print(f"[{account_name}] Reactie gestuurd in Discord: {response}", flush=True)
 
     except Exception as error:
-        print(f"[ERROR] {account_name}: {error}", flush=True)
+        print(f"[DISCORD ERROR] {account_name}: {error}", flush=True)
 
 async def trigger_first_message():
     await asyncio.sleep(8)
@@ -264,12 +328,12 @@ async def trigger_first_message():
                         "content": f"{starter.account_name}: {response}"
                     })
                 bot_chain[CHANNEL_ID] = 1
-            print(f"[{starter.account_name}] Startbericht gestuurd: {response}", flush=True)
+            print(f"[{starter.account_name}] Startbericht succesvol geplaatst: {response}", flush=True)
         except Exception as e:
             print(f"[KICKSTART ERROR] {e}", flush=True)
 
 # ==============================
-# DISCORD CLIENT
+# DISCORD CLIENT IMPLEMENTATIE
 # ==============================
 
 class MultiAccountBot(discord.Client):
@@ -285,7 +349,7 @@ class MultiAccountBot(discord.Client):
         await handle_message(message)
 
 # ==============================
-# MAIN
+# HOOFDPROGRAMMA (MAIN)
 # ==============================
 
 async def main():
@@ -305,13 +369,14 @@ async def main():
         print("[ERROR] Geen enkele bot token is geconfigureerd!", flush=True)
         raise RuntimeError("Geen tokens geconfigureerd!")
 
-    print("[STARTING] Starten van de selfbots...", flush=True)
+    print("[STARTING] Starten van de Discord selfbots...", flush=True)
 
     for name, bot in clients.items():
         asyncio.create_task(bot.start(bot.token_str))
         print(f"[INIT] Startsignaal gegeven voor {name}", flush=True)
         await asyncio.sleep(4)
 
+    # Start automatisch het gesprek zodat ze direct gaan kletsen
     asyncio.create_task(trigger_first_message())
 
     while True:
