@@ -16,8 +16,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Vastgesteld stabiel chat-model
-ACTIVE_MODEL = "llama-3.3-70b-versatile"
+# Aangepast naar het gevraagde model
+GROQ_MODEL = "openai/gpt-oss-20b"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
@@ -83,10 +83,8 @@ clients = {}
 
 async def generate_response(account_name):
     async with history_lock:
-        # Zorg ervoor dat de rollen netjes om en om of geldig zijn voor Groq
         raw_conversation = list(history[-MAX_HISTORY:])
 
-    # Bouw een schone lijst op voor de chat API
     messages = [
         {
             "role": "system",
@@ -94,7 +92,6 @@ async def generate_response(account_name):
         }
     ]
 
-    # Voeg alleen geldige user/assistant berichten toe
     for msg in raw_conversation:
         role = msg.get("role", "user")
         if role not in ["user", "assistant"]:
@@ -107,7 +104,7 @@ async def generate_response(account_name):
     try:
         completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
-            model=ACTIVE_MODEL,
+            model=GROQ_MODEL,
             messages=messages,
             max_tokens=80,
             temperature=0.9
