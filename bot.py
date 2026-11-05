@@ -1,3 +1,18 @@
+import sys
+import types
+
+# Noodoplossing voor Python 3.14 op Render: maak een lege 'audioop' module aan zodat discord.py niet crasht
+if "audioop" not in sys.modules:
+    fake_audioop = types.ModuleType("audioop")
+    fake_audioop.lin2adpcm = lambda *args, **kwargs: None
+    fake_audioop.adpcm2lin = lambda *args, **kwargs: None
+    fake_audioop.lin2lin = lambda *args, **kwargs: None
+    fake_audioop.ratecv = lambda *args, **kwargs: (b"", 0)
+    fake_audioop.minmax = lambda *args, **kwargs: (0, 0)
+    fake_audioop.avg = lambda *args, **kwargs: 0
+    fake_audioop.max = lambda *args, **kwargs: 0
+    sys.modules["audioop"] = fake_audioop
+
 import asyncio
 import os
 import random
@@ -41,24 +56,20 @@ class MultiAccountBot(commands.Bot):
         if message.guild is None or message.guild.id != GUILD_ID or message.channel.id != CHANNEL_ID:
             return
 
-        # Sla het bericht op in de geschiedenis
         async with history_lock:
             message_history.append({"role": "user", "content": f"{message.author.name}: {message.content}"})
             if len(message_history) > 12:
                 message_history.pop(0)
 
-        # Negeer eigen berichten van dit specifieke account
         if message.author.id == self.user.id:
             return
 
-        # Willekeurige kans zodat ze niet op elk los bericht reageren
         if random.random() > 0.45:
             return
 
         await asyncio.sleep(random.uniform(2.0, 4.5))
 
         try:
-            # Vraag Groq AI om een reactie
             completion = client_groq.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "system", "content": SYSTEM_PROMPTS[self.account_name]}] + message_history,
