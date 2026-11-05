@@ -1,4 +1,4 @@
-# Alex, Jay & Mia Discord Selfbot Cluster - Updated Model Edition
+# Alex, Jay & Mia Discord Selfbot Cluster - Final Clean Edition
 
 import os
 import asyncio
@@ -18,8 +18,8 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Actief en ondersteund Groq model
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Vastgesteld actief model op Groq
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 ACCOUNTS = {
     "Alex": os.getenv("TOKEN_ALEX"),
